@@ -1,5 +1,5 @@
 IDIR=include
-CXX=g++-8
+CXX=g++
 CXXFLAGS=-I$(IDIR) -std=c++11 -fopenmp -O3
 
 ODIR=src
