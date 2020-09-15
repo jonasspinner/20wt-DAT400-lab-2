@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <vector>
 #include <iostream>
+#include <iomanip>
 #include "vector_ops.h" 
 
 //#define BLOCK_TILE 
@@ -202,13 +203,16 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
      m2_columns: int, number of columns in the right matrix m2
      Output: vector, m1 * m2, product of two vectors m1 and m2, a matrix of size m1_rows x m2_columns
      */
-    
+
+    const auto start = std::chrono::steady_clock::now();
+
+    const int N = m1_rows;
+    const int M = m2_columns;
+    const int K = m1_columns;
+
     vector <float> output (m1_rows*m2_columns, 0);
 #if defined(BLOCK_TILE)
     const int block_size = 64 / sizeof(float); // 64 = common cache line size
-    int N = m1_rows;
-    int M = m2_columns; 
-    int K = m1_columns;
 // [TASK] WRITE CODE FOR BLOCK TILLING HERE
 #elif defined(USE_PTHREAD) 
 
@@ -232,6 +236,15 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
         }
     }
 #endif
+
+    const auto end = std::chrono::steady_clock::now();
+    const auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+
+    std::cout << std::setw(4) << N << " "
+              << std::setw(4) << K << " "
+              << std::setw(4) << M << " "
+              << std::setw(8) << duration.count() << "ns \n";
+
   return output;
 }
 
