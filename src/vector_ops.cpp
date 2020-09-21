@@ -4,10 +4,10 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include "vector_ops.h" 
+#include "vector_ops.h"
 
-//#define BLOCK_TILE 
-//#define USE_PTHREAD 
+//#define BLOCK_TILE
+#define USE_PTHREAD
 
 #ifdef USE_PTHREAD
 struct gemm_thread_args
@@ -31,6 +31,7 @@ void *dot_block (void *args) {
             }
         }
     }
+    return nullptr;
 }
 #endif
 
@@ -191,6 +192,16 @@ vector <float> transform (float *m, const int C, const int R) {
     return mT;
 }
 
+
+namespace vector_ops {
+    namespace internal {
+        std::map<std::tuple<int, int, int>, std::chrono::nanoseconds>& dot_timing_info() {
+            static std::map<std::tuple<int, int, int>, std::chrono::nanoseconds> map;
+            return map;
+        }
+    }
+}
+
 vector <float> dot (const vector <float>& m1, const vector <float>& m2, const int m1_rows, const int m1_columns, const int m2_columns) {
     
     /*  Returns the product of two matrices: m1 x m2.
@@ -210,22 +221,48 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
     const int M = m2_columns;
     const int K = m1_columns;
 
-    vector <float> output (m1_rows*m2_columns, 0);
+    vector <float> output (N * M, 0);
 #if defined(BLOCK_TILE)
     const int block_size = 64 / sizeof(float); // 64 = common cache line size
-// [TASK] WRITE CODE FOR BLOCK TILLING HERE
-#elif defined(USE_PTHREAD) 
 
-    const int num_partitions = 1; //[TASK] SHOULD BE CONFIGURED BY USER
+    for ( int row_block_start = 0; row_block_start < N; row_block_start += block_size ) {
+        const int row_block_end = std::min(row_block_start + block_size, N);
+
+        for ( int col_block_start = 0; col_block_start < M; col_block_start += block_size ) {
+            const int col_block_end = std::min(col_block_start + block_size, M);
+
+            for ( int k_block_start = 0; k_block_start < K; k_block_start += block_size ) {
+                const int k_block_end = std::min(k_block_start + block_size, K);
+
+                for ( int k = k_block_start; k < k_block_end; ++k ) {
+                    for ( int row = row_block_start; row < row_block_end; ++row ) {
+                        for ( int col = col_block_start; col < col_block_end; ++col ) {
+                            output[ row * M + col ] += m1[ row * K + k ] * m2[ k * M + col ];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+#elif defined(USE_PTHREAD)
+    const int num_partitions = 4;
     pthread_t threads[num_partitions];
+
     for (int i = 0; i < num_partitions; ++i) {
       gemm_thread_args* args = new gemm_thread_args;
       args->output = &output;
-      // assign rest of the arguments of gemm_thread_args accordingly
-      //pthread_create( [TASK] FILL IN ARGUMENTS );   
+      args->m1 = &m1;
+      args->m2 = &m2;
+      args->m1_rows = m1_rows;
+      args->m1_columns = m1_columns;
+      args->m2_columns = m2_columns;
+      args->row_start = (i * m1_rows) / num_partitions;
+      args->row_end = ((i + 1) * m1_rows) / num_partitions;
+      pthread_create(&threads[i], NULL, dot_block, args);
     }
     for (int i = 0; i < num_partitions; ++i) {
-      //pthread_join( [TASK] FILL IN ARGUMENTS);
+      pthread_join(threads[i], NULL);
     }
 #else
     for( int row = 0; row < m1_rows; ++row ) {
@@ -240,13 +277,7 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
 
-    std::cout << std::setw(4) << N << " "
-              << std::setw(4) << K << " "
-              << std::setw(4) << M << " "
-              << std::setw(8) << duration.count() << "ns \n";
-
+  vector_ops::internal::dot_timing_info()[{N, K, M}] += duration;
   return output;
 }
-
-
 

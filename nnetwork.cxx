@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 #include <chrono>
+#include <iomanip>
 #include "deep_core.h"
 #include "vector_ops.h"
 
@@ -71,7 +72,8 @@ int main(int argc, char * argv[]) {
   vector <float> W2 = random_vector(128*64);
   vector <float> W3 = random_vector(64*10);
   
-  std::chrono::time_point<std::chrono::system_clock> t1,t2;     
+  std::chrono::time_point<std::chrono::system_clock> t1, t2;
+  auto epoch_time = std::chrono::steady_clock::now();
   cout << "Training the model ...\n";
   for (unsigned i = 0; i < 1000; ++i) {    
     t1 = std::chrono::system_clock::now();    
@@ -126,7 +128,38 @@ int main(int argc, char * argv[]) {
       cout << "Iteration #: "  << i << endl;
       cout << "Iteration Time: "  << ticks << "s" << endl;
       cout << "Loss: " << loss/BATCH_SIZE << endl;
+
+      std::chrono::nanoseconds total_time_in_dot{0};
+      for (auto &kv : vector_ops::internal::dot_timing_info()) {
+          auto N = std::get<0>(kv.first);
+          auto K = std::get<1>(kv.first);
+          auto M = std::get<2>(kv.first);
+          auto duration = kv.second;
+
+          std::cout << std::setw(4) << N << " "
+                    << std::setw(4) << K << " "
+                    << std::setw(4) << M << " "
+                    << std::setw(12) << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << " ms\n";
+
+          total_time_in_dot += duration;
+      }
+
+      for (auto &kv : vector_ops::internal::dot_timing_info()) {
+          kv.second = std::chrono::nanoseconds{};
+      }
+
+
+      auto prev_epoch_time = epoch_time;
+      epoch_time = std::chrono::steady_clock::now();
+
+      auto epoch_duration = std::chrono::duration_cast<std::chrono::nanoseconds>(epoch_time - prev_epoch_time);
+      
+      std::cout << "time spent in dot " << std::chrono::duration_cast<std::chrono::milliseconds>(total_time_in_dot).count() << " ms\n";
+      std::cout << "total epoch time " << std::chrono::duration_cast<std::chrono::milliseconds>(epoch_duration).count() << " ms\n";
+      std::cout << total_time_in_dot.count() * 100.0 / epoch_duration.count() << " %\n";
+
       cout << "*******************************************" << endl;
+
     };      
   };
   
