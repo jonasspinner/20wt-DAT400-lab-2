@@ -6,6 +6,7 @@
 #include <iomanip>
 #include "vector_ops.h"
 
+//define LOOP_TRANSFORMATION
 //#define BLOCK_TILE
 #define USE_PTHREAD
 
@@ -199,10 +200,16 @@ namespace vector_ops {
             static std::map<std::tuple<int, int, int>, std::chrono::nanoseconds> map;
             return map;
         }
-    }
+
+        Config &config() {
+            static Config global_config;
+            return global_config;
+        }
+    };
 }
 
-vector <float> dot (const vector <float>& m1, const vector <float>& m2, const int m1_rows, const int m1_columns, const int m2_columns) {
+vector <float> dot (const vector <float>& m1, const vector <float>& m2, const int m1_rows, const int m1_columns,
+                    const int m2_columns) {
     
     /*  Returns the product of two matrices: m1 x m2.
      Inputs:
@@ -234,8 +241,8 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
             for ( int k_block_start = 0; k_block_start < K; k_block_start += block_size ) {
                 const int k_block_end = std::min(k_block_start + block_size, K);
 
-                for ( int k = k_block_start; k < k_block_end; ++k ) {
-                    for ( int row = row_block_start; row < row_block_end; ++row ) {
+                for ( int row = row_block_start; row < row_block_end; ++row ) {
+                    for ( int k = k_block_start; k < k_block_end; ++k ) {
                         for ( int col = col_block_start; col < col_block_end; ++col ) {
                             output[ row * M + col ] += m1[ row * K + k ] * m2[ k * M + col ];
                         }
@@ -246,8 +253,8 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
     }
 
 #elif defined(USE_PTHREAD)
-    const int num_partitions = 4;
-    pthread_t threads[num_partitions];
+    const int num_partitions = vector_ops::internal::config().num_threads;
+    std::vector<pthread_t> threads(num_partitions);
 
     for (int i = 0; i < num_partitions; ++i) {
       gemm_thread_args* args = new gemm_thread_args;
@@ -264,10 +271,20 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
     for (int i = 0; i < num_partitions; ++i) {
       pthread_join(threads[i], NULL);
     }
-#else
+
+#elif defined(LOOP_TRANSFORMATION)
     for( int row = 0; row < m1_rows; ++row ) {
         for( int k = 0; k < m1_columns; ++k ) {
             for( int col = 0; col < m2_columns; ++col ) {
+                output[ row * m2_columns + col ] += m1[ row * m1_columns + k ] * m2[ k * m2_columns + col ];
+            }
+        }
+    }
+
+#else
+    for( int row = 0; row < m1_rows; ++row ) {
+        for( int col = 0; col < m2_columns; ++col ) {
+            for( int k = 0; k < m1_columns; ++k ) {
                 output[ row * m2_columns + col ] += m1[ row * m1_columns + k ] * m2[ k * m2_columns + col ];
             }
         }

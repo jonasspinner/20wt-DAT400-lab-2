@@ -12,6 +12,7 @@
 #include <string>
 #include <chrono>
 #include <iomanip>
+#include <cmath>
 #include "deep_core.h"
 #include "vector_ops.h"
 
@@ -27,7 +28,35 @@ vector<string> split(const string &s, char delim) {
   return tokens;
 }
 
+
+template <typename T>
+T sum(const std::vector<T> &vals) {
+    T s{};
+    for (const auto &x : vals)
+        s += x;
+    return s;
+}
+
+template <typename T>
+std::pair<T, T> mean_and_std(const std::vector<T> &vals) {
+    T m{};
+    for (const auto &x : vals)
+        m += x;
+    m /= vals.size();
+
+    T s2{};
+    for (const auto &x : vals)
+        s2 += (x - m) * (x - m);
+    s2 /= (vals.size() - 1);
+    auto s = std::sqrt(s2);
+    return {m, s};
+}
+
 int main(int argc, char * argv[]) {
+  if (argc > 1) {
+      auto &config = vector_ops::internal::config();
+      config.num_threads = std::stoi(argv[1]);
+  }
 
   string line;
   vector<string> line_v;
@@ -73,6 +102,7 @@ int main(int argc, char * argv[]) {
   vector <float> W3 = random_vector(64*10);
   
   std::chrono::time_point<std::chrono::system_clock> t1, t2;
+  std::vector<double> time_in_dot_history, time_in_epoch_history;
   auto epoch_time = std::chrono::steady_clock::now();
   cout << "Training the model ...\n";
   for (unsigned i = 0; i < 1000; ++i) {    
@@ -153,15 +183,23 @@ int main(int argc, char * argv[]) {
       epoch_time = std::chrono::steady_clock::now();
 
       auto epoch_duration = std::chrono::duration_cast<std::chrono::nanoseconds>(epoch_time - prev_epoch_time);
-      
+
       std::cout << "time spent in dot " << std::chrono::duration_cast<std::chrono::milliseconds>(total_time_in_dot).count() << " ms\n";
       std::cout << "total epoch time " << std::chrono::duration_cast<std::chrono::milliseconds>(epoch_duration).count() << " ms\n";
       std::cout << total_time_in_dot.count() * 100.0 / epoch_duration.count() << " %\n";
+
+      time_in_dot_history.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(total_time_in_dot).count());
+      time_in_epoch_history.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(epoch_duration).count());
 
       cout << "*******************************************" << endl;
 
     };      
   };
-  
+
+  auto p1 = mean_and_std(time_in_dot_history);
+  std::cout << "dot in one epoch " << p1.first << " +- " << p1.second << " ms\n";
+  auto p2 = mean_and_std(time_in_epoch_history);
+  std::cout << "per epoch " << p2.first << " +- " << p2.second << " ms\n";
+  std::cout << (sum(time_in_dot_history) * 100.0 / sum(time_in_epoch_history)) << " %\n";
   return 0;
 }

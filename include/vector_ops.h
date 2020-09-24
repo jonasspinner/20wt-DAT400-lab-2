@@ -19,6 +19,11 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
 namespace vector_ops {
     namespace internal {
         std::map<std::tuple<int, int, int>, std::chrono::nanoseconds>& dot_timing_info();
+
+        struct Config {
+            int num_threads = 1;
+        };
+        Config &config();
     }
 }
 
