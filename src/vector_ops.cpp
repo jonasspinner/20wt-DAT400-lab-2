@@ -4,11 +4,18 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "vector_ops.h"
 
 //define LOOP_TRANSFORMATION
 //#define BLOCK_TILE
-#define USE_PTHREAD
+//#define USE_PTHREAD
+#ifdef _OPENMP
+#define USE_OMP
+#endif
 
 #ifdef USE_PTHREAD
 struct gemm_thread_args
@@ -277,6 +284,34 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
         for( int k = 0; k < m1_columns; ++k ) {
             for( int col = 0; col < m2_columns; ++col ) {
                 output[ row * m2_columns + col ] += m1[ row * m1_columns + k ] * m2[ k * m2_columns + col ];
+            }
+        }
+    }
+
+#elif defined(USE_OMP)
+    //#define LAB4_TASK1_PRINT_OUTPUT
+
+    #pragma omp parallel
+    {
+#ifdef LAB4_TASK1_PRINT_OUTPUT
+        int thread_id = omp_get_thread_num();
+        int num_threads = omp_get_num_threads();
+
+        #pragma omp critical
+        std::cout << thread_id << " ";
+        #pragma omp barrier
+        #pragma omp single
+        {
+            std::cout << "\nnum_threads = " << num_threads << "\n";
+        };
+#endif
+
+        #pragma omp for
+        for( int row = 0; row < m1_rows; ++row ) {
+            for( int k = 0; k < m1_columns; ++k ) {
+                for( int col = 0; col < m2_columns; ++col ) {
+                    output[ row * m2_columns + col ] += m1[ row * m1_columns + k ] * m2[ k * m2_columns + col ];
+                }
             }
         }
     }
