@@ -10,7 +10,7 @@
 
 #include "vector_ops.h"
 
-//define LOOP_TRANSFORMATION
+//#define LOOP_TRANSFORMATION
 //#define BLOCK_TILE
 //#define USE_PTHREAD
 #ifdef _OPENMP

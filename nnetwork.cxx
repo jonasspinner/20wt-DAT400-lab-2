@@ -13,6 +13,8 @@
 #include <chrono>
 #include <iomanip>
 #include <cmath>
+#include <omp.h>
+
 #include "deep_core.h"
 #include "vector_ops.h"
 
@@ -104,6 +106,8 @@ int main(int argc, char * argv[]) {
   std::chrono::time_point<std::chrono::system_clock> t1, t2;
   std::vector<double> time_in_dot_history, time_in_epoch_history;
   auto epoch_time = std::chrono::steady_clock::now();
+  auto epoch_wtime = omp_get_wtime();
+
   cout << "Training the model ...\n";
   for (unsigned i = 0; i < 1000; ++i) {    
     t1 = std::chrono::system_clock::now();    
@@ -152,8 +156,10 @@ int main(int argc, char * argv[]) {
       for (unsigned k = 0; k < BATCH_SIZE*10; ++k){
         loss += loss_m[k]*loss_m[k];
       }      
+
       t2 = std::chrono::system_clock::now();
       chrono::duration<double> elapsed_seconds = t2-t1;
+
       double ticks = elapsed_seconds.count();
       cout << "Iteration #: "  << i << endl;
       cout << "Iteration Time: "  << ticks << "s" << endl;
@@ -181,12 +187,16 @@ int main(int argc, char * argv[]) {
 
       auto prev_epoch_time = epoch_time;
       epoch_time = std::chrono::steady_clock::now();
-
       auto epoch_duration = std::chrono::duration_cast<std::chrono::nanoseconds>(epoch_time - prev_epoch_time);
+
+      auto prev_epoch_wtime = epoch_wtime;
+      epoch_wtime = omp_get_wtime();
+      auto epoch_wduration = epoch_wtime - prev_epoch_wtime;
 
       std::cout << "time spent in dot " << std::chrono::duration_cast<std::chrono::milliseconds>(total_time_in_dot).count() << " ms\n";
       std::cout << "total epoch time " << std::chrono::duration_cast<std::chrono::milliseconds>(epoch_duration).count() << " ms\n";
       std::cout << total_time_in_dot.count() * 100.0 / epoch_duration.count() << " %\n";
+      std::cout << "omp_get_wtime() duration " << epoch_wduration << "\n";
 
       time_in_dot_history.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(total_time_in_dot).count());
       time_in_epoch_history.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(epoch_duration).count());
