@@ -10,11 +10,11 @@
 
 #include "vector_ops.h"
 
-//#define LOOP_TRANSFORMATION
+#define LOOP_TRANSFORMATION
 //#define BLOCK_TILE
 //#define USE_PTHREAD
 #ifdef _OPENMP
-#define USE_OMP
+//#define USE_OMP
 #endif
 
 #ifdef USE_PTHREAD
@@ -200,7 +200,7 @@ vector <float> transform (float *m, const int C, const int R) {
     return mT;
 }
 
-
+#ifndef USE_MPI
 namespace vector_ops {
     namespace internal {
         std::map<std::tuple<int, int, int>, std::chrono::nanoseconds>& dot_timing_info() {
@@ -214,6 +214,7 @@ namespace vector_ops {
         }
     };
 }
+#endif
 
 vector <float> dot (const vector <float>& m1, const vector <float>& m2, const int m1_rows, const int m1_columns,
                     const int m2_columns) {
@@ -228,8 +229,9 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
      m2_columns: int, number of columns in the right matrix m2
      Output: vector, m1 * m2, product of two vectors m1 and m2, a matrix of size m1_rows x m2_columns
      */
-
+#ifndef USE_MPI
     const auto start = std::chrono::steady_clock::now();
+#endif
 
     const int N = m1_rows;
     const int M = m2_columns;
@@ -326,10 +328,12 @@ vector <float> dot (const vector <float>& m1, const vector <float>& m2, const in
     }
 #endif
 
+#ifndef USE_MPI
     const auto end = std::chrono::steady_clock::now();
     const auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
 
-  vector_ops::internal::dot_timing_info()[{N, K, M}] += duration;
+    vector_ops::internal::dot_timing_info()[{N, K, M}] += duration;
+#endif
   return output;
 }
 

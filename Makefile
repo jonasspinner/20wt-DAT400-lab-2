@@ -1,6 +1,7 @@
 IDIR=include
-CXX=g++
-CXXFLAGS=-I$(IDIR) -std=c++11 -fopenmp -O3
+CXX=mpicxx
+MPICXX=mpicxx
+CXXFLAGS=-I$(IDIR) -std=c++11 -fopenmp -O3 -DUSE_MPI
 
 ODIR=src
 LDIR =../lib
@@ -35,7 +36,7 @@ run_pthreads:
 	./nnetwork
 
 run_parallel:
-	mpirun -np 4 ./nnetwork_mpi
+	mpirun -np 2 ./nnetwork_mpi
 
 all: clean nnetwork_mpi nnetwork
 .PHONY: clean
